@@ -11,6 +11,7 @@ import { StudentList } from '@/components/StudentList';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { BookingListView } from '@/components/BookingListView';
 import type { BookingInfo } from '@/types/booking';
+import { APP_VERSION } from '@/config/version';
 
 export default function Home() {
   const [view, setView] = useState<'calendar' | 'students'>('calendar');
@@ -146,7 +147,10 @@ export default function Home() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">課程預約系統</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">課程預約系統</h1>
+              <div className="text-xs text-gray-500 mt-0.5">v{APP_VERSION}</div>
+            </div>
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setIsAddStudentOpen(true)}

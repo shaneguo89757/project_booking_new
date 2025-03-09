@@ -126,6 +126,20 @@ export const Calendar = ({
         <span className="font-medium">{props.event.title}</span>
       </div>
     ),
+    dateCellWrapper: (props: any) => (
+      <div 
+        className="h-full w-full"
+        onClick={() => onDateClick(props.value)}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          onDateClick(props.value);
+        }}
+        role="button"
+        tabIndex={0}
+      >
+        {props.children}
+      </div>
+    ),
   };
 
   const handleNavigate = (newDate: Date) => {
