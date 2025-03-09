@@ -193,10 +193,10 @@ export const Calendar = ({
           date={currentDate}
           onNavigate={handleNavigate}
           toolbar={false}
+          selectable={true}
           onSelectSlot={(slotInfo: SlotInfo) => {
             onDateClick(slotInfo.start);
           }}
-          selectable
           popup={false}
           eventPropGetter={eventPropGetter}
           dayPropGetter={dayPropGetter}
