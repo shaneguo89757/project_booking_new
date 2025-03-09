@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo, View } from 'react-big-calendar';
+import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo } from 'react-big-calendar';
 import { format, parse, startOfWeek, getDay, setDefaultOptions } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { BookmarkIcon } from '@heroicons/react/24/solid';
