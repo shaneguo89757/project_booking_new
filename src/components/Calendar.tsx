@@ -110,7 +110,6 @@ export const Calendar = ({
   const dayPropGetter = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const isClassDay = bookings.some(booking => booking.date === dateStr && booking.isClassDay);
-    const isCurrentMonth = date.getMonth() === currentDate.getMonth();
 
     return {
       className: '',

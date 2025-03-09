@@ -65,7 +65,7 @@ export default function Home() {
   };
 
   const handleAddStudent = (name: string) => {
-    const newStudent = localStorageService.addStudent(name);
+    localStorageService.addStudent(name);
     setStudents(localStorageService.getStudents());
   };
 
