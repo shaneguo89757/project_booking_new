@@ -26,6 +26,7 @@ jobs:
         run: npm run build
         env:
           NEXT_PUBLIC_BASE_PATH: '/project_booking_new'
+          NEXT_PUBLIC_ASSET_PREFIX: '/project_booking_new' # 添加這行
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
