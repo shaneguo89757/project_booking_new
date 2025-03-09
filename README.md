@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 課程預約系統
 
-## Getting Started
+這是一個使用 Next.js 開發的課程預約系統，整合了 Google Calendar 和 Google Sheets 功能。
 
-First, run the development server:
+## 功能特點
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- 使用 Google 帳號登入
+- 月曆方式查看課程安排
+- 學員預約課程功能
+- 自動同步到 Google Calendar
+- 使用 Google Sheets 儲存預約資料
+
+## 技術棧
+
+- Next.js 15
+- React 19
+- TypeScript
+- Tailwind CSS
+- Google Calendar API
+- Google Sheets API
+
+## 開始使用
+
+1. 克隆專案：
+   ```bash
+   git clone [repository-url]
+   cd project_booking_new
+   ```
+
+2. 安裝依賴：
+   ```bash
+   npm install
+   ```
+
+3. 設置 Google API：
+   - 前往 [Google Cloud Console](https://console.cloud.google.com)
+   - 創建新專案
+   - 啟用 Google Calendar API 和 Google Sheets API
+   - 創建 OAuth 2.0 憑證
+   - 下載憑證
+
+4. 配置環境變數：
+   - 複製 `.env.local.example` 到 `.env.local`
+   - 填入你的 Google API 憑證：
+     ```
+     NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_client_id_here
+     NEXT_PUBLIC_GOOGLE_CLIENT_SECRET=your_client_secret_here
+     NEXT_PUBLIC_GOOGLE_CALENDAR_ID=your_calendar_id_here
+     NEXT_PUBLIC_GOOGLE_SHEET_ID=your_sheet_id_here
+     ```
+
+5. 運行開發服務器：
+   ```bash
+   npm run dev
+   ```
+
+6. 訪問 [http://localhost:3000](http://localhost:3000)
+
+## 部署
+
+本專案可以部署到 GitHub Pages：
+
+1. 在 GitHub 上創建倉庫
+
+2. 修改 `next.config.ts`：
+   ```typescript
+   const nextConfig = {
+     output: 'export',
+     basePath: '/your-repo-name',
+   };
+   ```
+
+3. 部署到 GitHub Pages：
+   ```bash
+   npm run build
+   ```
+
+## 專案結構
+
+```
+project_booking_new/
+├── src/
+│   ├── app/              # 頁面組件
+│   ├── components/       # React 組件
+│   └── services/         # 服務層（Google API 整合）
+├── public/              # 靜態資源
+└── package.json         # 專案配置
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 授權
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT License
