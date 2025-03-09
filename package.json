@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "cp next.config.prod.js next.config.js && next build && rm next.config.js",
     "start": "next start",
     "lint": "next lint"
   },
