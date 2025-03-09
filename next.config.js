@@ -8,6 +8,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,  // 構建時忽略 ESLint 錯誤
   },
+  distDir: 'docs',  // 將構建輸出到 docs 目錄
 }
 
 module.exports = nextConfig 

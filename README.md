@@ -90,3 +90,6 @@ project_booking_new/
 ## 授權
 
 MIT License
+
+
+npm run build && git add . && git commit -m "暫時禁用 ESLint" && git push | cat
