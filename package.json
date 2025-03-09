@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "cp next.config.prod.js next.config.js && next build  --no-lint && rm next.config.js",
+    "build": "next build  --no-lint",
     "start": "next start",
     "lint": "next lint"
   },
