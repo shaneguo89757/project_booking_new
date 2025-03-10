@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { format } from 'date-fns';
 import { BookmarkSlashIcon as LeaveIcon } from '@heroicons/react/24/outline';
@@ -13,12 +13,13 @@ interface BookingDialogProps {
   date: Date;
   students: string[];
   isClassDay: boolean;
-  onStartClass: () => void;
-  onCloseClass: () => void;
-  onRemoveStudent: (studentName: string) => void;
-  onAddStudent: (studentIds: string[]) => void;
+  onStartClass: (date: Date) => void;
+  onCloseClass: (date: Date) => void;
+  onRemoveStudent: (studentId: string, date: Date) => void;
+  onAddStudent: (studentIds: string[], date: Date) => void;
   allStudents: Student[];
   error?: string | null;
+  isLoading?: boolean;
 }
 
 export const BookingDialog = ({
@@ -33,8 +34,15 @@ export const BookingDialog = ({
   onAddStudent,
   allStudents,
   error,
+  isLoading = false,
 }: BookingDialogProps) => {
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
+
+  const bookedStudents = useMemo(() => {
+    return students.map(studentId => 
+      allStudents.find(s => s.id === studentId)
+    ).filter((s): s is Student => s !== undefined);
+  }, [students, allStudents]);
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
@@ -76,13 +84,13 @@ export const BookingDialog = ({
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-500">今天不想上班...</span>
                       <button
-                        onClick={onCloseClass}
-                      className="text-gray-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
-                      title="關閉課程"
-                    >
-                      <TrashIcon className="w-5 h-5" />
-                    </button>
-                  </div>
+                        onClick={() => onCloseClass(date)}
+                        className="text-gray-500 hover:text-red-600 p-2 rounded-full hover:bg-red-50 transition-colors"
+                        title="關閉課程"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    </div>
                   )}
                 </div>
 
@@ -105,15 +113,22 @@ export const BookingDialog = ({
                       </button>
                     </div>
                     <ul className="space-y-2">
-                      {students.map((student, index) => (
+                      {bookedStudents.map((student) => (
                         <li
-                          key={index}
+                          key={student.id}
                           className="p-2 bg-gray-50 rounded-lg flex justify-between items-center"
                         >
-                          <span>{student}</span>
+                          <div>
+                            <span>{student.name}</span>
+                            {student.instagram && (
+                              <span className="ml-2 text-sm text-gray-500">
+                                @{student.instagram}
+                              </span>
+                            )}
+                          </div>
                           <button
-                            onClick={() => onRemoveStudent(student)}
-                            className="text-gray-400 text-red-500 p-1 rounded-full bg-red-100 hover:bg-red-300"
+                            onClick={() => onRemoveStudent(student.id, date)}
+                            className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-100"
                           >
                             <LeaveIcon className="w-4 h-4" />
                           </button>
@@ -126,10 +141,21 @@ export const BookingDialog = ({
                     <p className="text-gray-500 mb-4">今日未安排課程</p>
                     <button
                       type="button"
-                      className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-                      onClick={onStartClass}
+                      className="inline-flex justify-center items-center rounded-md border border-transparent bg-blue-100 px-4 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => onStartClass(date)}
+                      disabled={isLoading}
                     >
-                      今日開課吧!
+                      {isLoading ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          處理中...
+                        </>
+                      ) : (
+                        '今日開課吧!'
+                      )}
                     </button>
                   </div>
                 )}
@@ -148,10 +174,8 @@ export const BookingDialog = ({
                   isOpen={isAddStudentOpen}
                   onClose={() => setIsAddStudentOpen(false)}
                   students={allStudents}
-                  onAdd={onAddStudent}
-                  existingStudentIds={allStudents
-                    .filter(s => students.includes(s.name))
-                    .map(s => s.id)}
+                  onAdd={(studentIds) => onAddStudent(studentIds, date)}
+                  existingStudentIds={students}
                 />
               </Dialog.Panel>
             </Transition.Child>
