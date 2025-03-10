@@ -40,7 +40,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [spreadsheetId, setSpreadsheetId] = useState<string>('');
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
@@ -316,7 +316,7 @@ export default function Home() {
     localStorage.removeItem('accessToken');
     // 可能需要清除其他狀態
     setSyncedData(null);
-    setSpreadsheetId(null);
+    setSpreadsheetId('');
   };
 
   if (!isAuthenticated) {

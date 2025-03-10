@@ -25,7 +25,6 @@ export default function RootLayout({
       <body className={inter.className}>
         <GoogleOAuthProvider 
           clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
-          scope={GOOGLE_SCOPES.join(' ')}
         >
           <main className="min-h-screen bg-gray-100">
             {children}
