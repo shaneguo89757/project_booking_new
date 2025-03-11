@@ -105,8 +105,8 @@ export default function Home() {
     setSelectedDate(null);
   };
 
-  const handleAddStudent = async (name: string) => {
-    await dataService.addStudent(name);
+  const handleAddStudent = async (name: string, instagram: string = "") => {
+    await dataService.addStudent(name, instagram);
   };
 
   const handleRemoveStudent = async (studentId: string, date: Date) => {

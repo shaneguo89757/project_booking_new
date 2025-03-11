@@ -518,7 +518,7 @@ export class SheetService {
       const newStudentData = [
         newStudent.id,
         newStudent.name,
-        newStudent.instagram || "",
+        newStudent.instagram,
         newStudent.active.toString().toLowerCase(),
       ];
 

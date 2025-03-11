@@ -1,10 +1,10 @@
-import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
+import { Fragment, useState } from 'react';
 
 interface AddStudentDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (name: string) => void;
+  onAdd: (name: string, instagram: string) => void;
 }
 
 export const AddStudentDialog = ({
@@ -13,13 +13,29 @@ export const AddStudentDialog = ({
   onAdd,
 }: AddStudentDialogProps) => {
   const [name, setName] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [nameError, setNameError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (name.trim()) {
-      onAdd(name.trim());
-      setName('');
-      onClose();
+    
+    // 验证名称是否填写
+    if (!name.trim()) {
+      setNameError('請輸入學員姓名');
+      return;
+    }
+    
+    onAdd(name.trim(), instagram.trim());
+    setName('');
+    setInstagram('');
+    setNameError('');
+    onClose();
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    if (e.target.value.trim()) {
+      setNameError('');
     }
   };
 
@@ -58,15 +74,39 @@ export const AddStudentDialog = ({
                 </Dialog.Title>
 
                 <form onSubmit={handleSubmit}>
-                  <div className="mt-2">
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="請輸入學員姓名"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      required
-                    />
+                  <div className="mt-2 space-y-4">
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                        姓名 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="name"
+                        type="text"
+                        value={name}
+                        onChange={handleNameChange}
+                        placeholder="請輸入學員姓名"
+                        className={`w-full px-3 py-2 border ${
+                          nameError ? 'border-red-500' : 'border-gray-300'
+                        } rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                      />
+                      {nameError && (
+                        <p className="mt-1 text-sm text-red-500">{nameError}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="instagram" className="block text-sm font-medium text-gray-700 mb-1">
+                        Instagram
+                      </label>
+                      <input
+                        id="instagram"
+                        type="text"
+                        value={instagram}
+                        onChange={(e) => setInstagram(e.target.value)}
+                        placeholder="請輸入 Instagram 帳號（選填）"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
                   </div>
 
                   <div className="mt-4 flex justify-end space-x-2">

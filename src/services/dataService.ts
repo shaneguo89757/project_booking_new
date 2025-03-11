@@ -207,9 +207,9 @@ class DataService {
   }
 
   // 學生相關方法
-  async addStudent(name: string) {
+  async addStudent(name: string, instagram: string = "") {
     try {
-      console.log("DataService: 开始添加新学员:", name);
+      console.log("DataService: 开始添加新学员:", { name, instagram });
 
       // 检查是否已设置 spreadsheetId
       if (!this.state.spreadsheetId) {
@@ -219,7 +219,7 @@ class DataService {
       // 创建新学员对象（不包含 ID，因为 ID 将由 SheetService 生成）
       const studentData = {
         name,
-        instagram: "",
+        instagram,
         active: true,
       };
 
