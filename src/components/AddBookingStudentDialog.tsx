@@ -1,7 +1,7 @@
-import { Fragment, useState } from 'react';
+import type { Student } from '@/services/sheetService';
 import { Dialog, Transition } from '@headlessui/react';
-import type { Student } from '@/services/localStorageService';
 import { CheckIcon } from '@heroicons/react/24/outline';
+import { Fragment, useState } from 'react';
 
 interface AddBookingStudentDialogProps {
   isOpen: boolean;

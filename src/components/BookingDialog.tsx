@@ -1,11 +1,9 @@
-import { Fragment, useState, useMemo } from 'react';
+import type { Student } from '@/services/sheetService';
 import { Dialog, Transition } from '@headlessui/react';
+import { BookmarkSlashIcon as LeaveIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
-import { BookmarkSlashIcon as LeaveIcon } from '@heroicons/react/24/outline';
-import { TrashIcon } from '@heroicons/react/24/outline';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { Fragment, useMemo, useState } from 'react';
 import { AddBookingStudentDialog } from './AddBookingStudentDialog';
-import type { Student } from '@/services/localStorageService';
 
 interface BookingDialogProps {
   isOpen: boolean;

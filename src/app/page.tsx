@@ -1,107 +1,36 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Calendar } from '@/components/Calendar';
-import { BookingDialog } from '@/components/BookingDialog';
 import { AddStudentDialog } from '@/components/AddStudentDialog';
-import { localStorageService, type Booking, type Student } from '@/services/localStorageService';
-import { format } from 'date-fns';
-import { UserPlusIcon, TableCellsIcon, ListBulletIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
-import { StudentList } from '@/components/StudentList';
-import { EditStudentDialog } from '@/components/EditStudentDialog';
+import { BookingDialog } from '@/components/BookingDialog';
 import { BookingListView } from '@/components/BookingListView';
-import type { BookingInfo } from '@/types/booking';
-import { APP_VERSION } from '@/config/version';
+import { Calendar } from '@/components/Calendar';
+import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { GoogleLogin } from '@/components/GoogleLogin';
-import { sheetService } from '@/services/sheetService';
+import { StudentList } from '@/components/StudentList';
+import { APP_VERSION } from '@/config/version';
+import type { DataServiceState } from '@/services/dataService';
+import { dataService } from '@/services/dataService';
+import type { Student } from '@/services/sheetService';
 import { normalizeDate } from '@/utils/dateUtils';
+import { ArrowPathIcon, ListBulletIcon, TableCellsIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import { format } from 'date-fns';
 import { useSearchParams } from 'next/navigation';
-
-interface SyncHistory {
-  timestamp: number;
-  status: 'success' | 'error';
-  message?: string;
-}
-
-interface SyncedData {
-  classDays: ClassDay[];
-  bookings: Booking[];
-  students: Student[];
-}
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [view, setView] = useState<'calendar' | 'students'>('calendar');
   const [calendarView, setCalendarView] = useState<'grid' | 'list'>('grid');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isClient, setIsClient] = useState(false);
   const [isAddStudentOpen, setIsAddStudentOpen] = useState(false);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [spreadsheetId, setSpreadsheetId] = useState<string>('');
-  const [sheetData, setSheetData] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [autoSync, setAutoSync] = useState(false);
-  const [syncHistory, setSyncHistory] = useState<SyncHistory[]>([]);
-  const [syncedData, setSyncedData] = useState<SyncedData | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const searchParams = useSearchParams();
+  const [state, setState] = useState<DataServiceState>(dataService.getState());
 
-  // 檢查是否在客戶端
+  // 訂閱數據變化
   useEffect(() => {
-    setIsClient(true);
+    return dataService.subscribe(setState);
   }, []);
-
-  // 載入初始資料
-  useEffect(() => {
-    if (isClient) {
-      setBookings(localStorageService.getBookings());
-      setStudents(localStorageService.getStudents());
-    }
-  }, [isClient]);
-
-  // 載入儲存的設定
-  useEffect(() => {
-    const savedId = localStorage.getItem('spreadsheetId');
-    if (savedId) setSpreadsheetId(savedId);
-    
-    const savedAutoSync = localStorage.getItem('autoSync');
-    if (savedAutoSync) setAutoSync(JSON.parse(savedAutoSync));
-  }, []);
-
-  // 在組件載入時檢查 localStorage
-  useEffect(() => {
-    const savedToken = localStorage.getItem('accessToken');
-    if (savedToken) {
-      setAccessToken(savedToken);
-      sheetService.setAccessToken(savedToken);
-      setIsAuthenticated(true);
-    }
-  }, []);
-
-  // 自動同步設定
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (autoSync && isAuthenticated) {
-      interval = setInterval(() => {
-        handleSync();
-      }, 5 * 60 * 1000); // 每5分鐘同步一次
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoSync, isAuthenticated]);
-
-  // 當切換到學員管理視圖時自動同步
-  useEffect(() => {
-    if (view === 'students' && isAuthenticated && spreadsheetId) {
-      handleSync();
-    }
-  }, [view, isAuthenticated, spreadsheetId]);
 
   // 處理重定向後的登入狀態
   useEffect(() => {
@@ -113,156 +42,42 @@ export default function Home() {
     }
   }, [searchParams]);
 
-  const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
-  };
-
-  const handleStartClass = async (date: Date) => {
-    if (!spreadsheetId || !accessToken) {
-      setError('尚未設定試算表 ID 或未登入');
-      return;
+  // 載入儲存的自動同步設定
+  useEffect(() => {
+    const savedAutoSync = localStorage.getItem('autoSync');
+    if (savedAutoSync) {
+      setAutoSync(JSON.parse(savedAutoSync));
     }
+  }, []);
 
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const dateStr = format(date, 'yyyy-MM-dd');
-      console.log('Starting class for date:', dateStr);
-      
-      await sheetService.addClassDay(spreadsheetId, dateStr);
-      console.log('Class added successfully');
-      
-      await handleSync();
-      setSelectedDate(null);
-    } catch (error) {
-      console.error('Error starting class:', error);
-      setError(error instanceof Error ? error.message : '開課失敗');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCloseClass = async (date: Date) => {
-    if (!spreadsheetId || !accessToken) {
-      setError('尚未設定試算表 ID 或未登入');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const dateStr = format(date, 'yyyy-M-d');
-      console.log('Attempting to delete class for date:', dateStr);
-      
-      await sheetService.deleteClassDay(spreadsheetId, dateStr);
-      console.log('Class deleted successfully');
-      
-      // 重新同步資料
-      await handleSync();
-      setSelectedDate(null);
-    } catch (error) {
-      console.error('Error closing class:', error);
-      setError(error instanceof Error ? error.message : '關閉課程失敗');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddStudent = (name: string) => {
-    localStorageService.addStudent(name);
-    setStudents(localStorageService.getStudents());
-  };
-
-  const handleRemoveStudent = async (studentId: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    // TODO: 實作 Google Sheet API 移除學生預約
-    const result = localStorageService.removeStudentFromBooking(studentId, dateStr);
-    if (result.success) {
-      await handleSync(); // 重新同步資料
-      setError(null);
-    } else {
-      setError(result.error || '移除學生失敗');
-    }
-  };
-
-  const handleAddBookingStudent = async (studentIds: string[], date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    // TODO: 實作 Google Sheet API 新增學生預約
-    const result = localStorageService.addStudentBooking(studentIds[0], [dateStr]);
-    if (result.success) {
-      await handleSync(); // 重新同步資料
-      setError(null);
-    } else {
-      setError(result.error || '添加學生失敗');
-    }
-  };
-
-  const handleDeleteStudent = (student: Student) => {
-    if (confirm(`確定要刪除學生 ${student.name} 嗎？`)) {
-      const result = localStorageService.deleteStudent(student.id);
-      if (result.success) {
-        setStudents(localStorageService.getStudents());
-      } else {
-        alert(result.error);
-      }
-    }
-  };
-
-  const handleEditStudent = (student: Student) => {
-    setEditingStudent(student);
-  };
-
-  const handleSaveEditStudent = (newName: string) => {
-    if (!editingStudent) return;
+  // 自動同步設定
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
     
-    const result = localStorageService.editStudent(editingStudent.id, newName);
-    if (result.success) {
-      setStudents(localStorageService.getStudents());
-      setBookings(localStorageService.getBookings());
-    } else {
-      alert(result.error);
+    if (autoSync && state.isAuthenticated) {
+      interval = setInterval(() => {
+        dataService.syncAll();
+      }, 5 * 60 * 1000); // 每5分鐘同步一次
     }
-    setEditingStudent(null);
-  };
 
-  // 轉換 Google Sheet 資料為行事曆格式
-  const transformedBookings: BookingInfo[] = useMemo(() => {
-    if (!syncedData) return [];
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [autoSync, state.isAuthenticated]);
 
-    // 建立日期對應的預約資料
-    const bookingMap = new Map<string, string[]>();
-    syncedData.bookings.forEach(booking => {
-      if (!bookingMap.has(booking.date)) {
-        bookingMap.set(booking.date, []);
-      }
-      // 找到對應的學生名稱
-      const student = syncedData.students.find(s => s.id === booking.studentId);
-      if (student) {
-        bookingMap.get(booking.date)?.push(student.name);
-      }
-    });
-
-    // 將開課日期和預約資料合併
-    return syncedData.classDays.map(day => ({
-      date: day.date,
-      students: bookingMap.get(day.date) || [],
-      isClassDay: true,
-    }));
-  }, [syncedData]);
+  // 當切換到學員管理視圖時自動同步
+  useEffect(() => {
+    if (view === 'students' && state.isAuthenticated && state.spreadsheetId) {
+      dataService.syncAll();
+    }
+  }, [view, state.isAuthenticated, state.spreadsheetId]);
 
   const handleLoginSuccess = (token: string) => {
-    setAccessToken(token);
-    sheetService.setAccessToken(token);
-    setIsAuthenticated(true);
-    // 保存 token 到 localStorage
-    localStorage.setItem('accessToken', token);
+    dataService.setAccessToken(token);
   };
 
   const handleSpreadsheetIdChange = (id: string) => {
-    setSpreadsheetId(id);
-    localStorage.setItem('spreadsheetId', id);
+    dataService.setSpreadsheetId(id);
   };
 
   const handleAutoSyncChange = (enabled: boolean) => {
@@ -270,71 +85,67 @@ export default function Home() {
     localStorage.setItem('autoSync', JSON.stringify(enabled));
   };
 
-  const addSyncHistory = (status: 'success' | 'error', message?: string) => {
-    setSyncHistory(prev => [{
-      timestamp: Date.now(),
-      status,
-      message
-    }, ...prev.slice(0, 9)]); // 只保留最近10筆記錄
+  const handleStartClass = async (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    await dataService.startClass(dateStr);
+    setSelectedDate(null);
   };
 
-  const handleSync = async () => {
-    if (!spreadsheetId || !accessToken) {
-      setError('尚未設定試算表 ID 或未登入');
-      return;
-    }
+  const handleCloseClass = async (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    await dataService.closeClass(dateStr);
+    setSelectedDate(null);
+  };
 
-    try {
-      setIsLoading(true);
-      setError(null);
+  const handleAddStudent = async (name: string) => {
+    await dataService.addStudent(name);
+  };
 
-      // 確保每次操作都設定 token
-      sheetService.setAccessToken(accessToken);
-      const data = await sheetService.syncAll(spreadsheetId);
-      setSyncedData(data);
-      addSyncHistory('success');
-    } catch (error) {
-      console.error('Sync error:', error);
-      const errorMessage = error instanceof Error ? error.message : '同步失敗';
-      setError(errorMessage);
-      addSyncHistory('error', errorMessage);
-      
-      // 如果是認證錯誤，可能需要重新登入
-      if (error instanceof Error && error.message.includes('Not authenticated')) {
-        setIsAuthenticated(false);
-        setAccessToken(null);
-      }
-    } finally {
-      setIsLoading(false);
+  const handleRemoveStudent = async (studentId: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    await dataService.removeBooking(studentId, dateStr);
+  };
+
+  const handleAddBookingStudent = async (studentIds: string[], date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    await dataService.addBooking(studentIds[0], [dateStr]);
+  };
+
+  const handleDeleteStudent = async (student: Student) => {
+    if (confirm(`確定要刪除學生 ${student.name} 嗎？`)) {
+      await dataService.deleteStudent(student.id);
     }
   };
 
-  // 新增登出函數
-  const handleLogout = () => {
-    setAccessToken(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('accessToken');
-    // 可能需要清除其他狀態
-    setSyncedData(null);
-    setSpreadsheetId('');
+  const handleEditStudent = (student: Student) => {
+    setEditingStudent(student);
   };
 
-  if (!isAuthenticated) {
+  const handleSaveEditStudent = async (newName: string) => {
+    if (!editingStudent) return;
+    await dataService.editStudent(editingStudent.id, newName);
+    setEditingStudent(null);
+  };
+
+  // 轉換資料為行事曆格式
+  const transformedBookings = state.bookings.map(booking => ({
+    date: booking.date,
+    students: booking.students.map(s => s.name),
+    isClassDay: booking.isClassDay,
+  }));
+
+  if (!state.isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">課程預約系統</h1>
           <GoogleLogin
             onSuccess={handleLoginSuccess}
-            onError={(error) => setError(error)}
+            onError={(error) => setState(prev => ({ ...prev, error }))}
           />
         </div>
       </div>
     );
-  }
-
-  if (!isClient) {
-    return null; // 或顯示載入中的畫面
   }
 
   return (
@@ -376,9 +187,9 @@ export default function Home() {
                   學員管理
                 </button>
               </div>
-              {isAuthenticated && (
+              {state.isAuthenticated && (
                 <button
-                  onClick={handleLogout}
+                  onClick={() => dataService.logout()}
                   className="px-4 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg"
                 >
                   登出
@@ -419,26 +230,26 @@ export default function Home() {
               </div>
               
               <button
-                onClick={handleSync}
-                disabled={isLoading}
+                onClick={() => dataService.syncAll()}
+                disabled={state.isLoading}
                 className={`inline-flex items-center px-4 py-2 rounded-lg ${
-                  isLoading
+                  state.isLoading
                     ? 'bg-gray-100 text-gray-400'
                     : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                 }`}
               >
                 <ArrowPathIcon 
-                  className={`w-5 h-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} 
+                  className={`w-5 h-5 mr-2 ${state.isLoading ? 'animate-spin' : ''}`} 
                 />
-                {isLoading ? '同步中...' : '同步資料'}
+                {state.isLoading ? '同步中...' : '同步資料'}
               </button>
             </div>
 
             {calendarView === 'grid' ? (
               <Calendar 
                 bookings={transformedBookings} 
-                onDateClick={handleDateClick}
-                maxStudents={localStorageService.getMaxStudentsPerClass()}
+                onDateClick={setSelectedDate}
+                maxStudents={7}
               />
             ) : (
               <BookingListView bookings={transformedBookings} />
@@ -446,18 +257,17 @@ export default function Home() {
           </div>
         ) : (
           <>
-            {/* 加入除錯資訊 */}
             <div className="mb-4 text-sm text-gray-500">
-              已載入 {syncedData?.students?.length || 0} 位學生
+              已載入 {state.students.length || 0} 位學生
             </div>
             
             <StudentList
-              students={syncedData?.students || []}
+              students={state.students}
               onAddStudent={() => setIsAddStudentOpen(true)}
               onEditStudent={handleEditStudent}
               onDeleteStudent={handleDeleteStudent}
-              onSync={handleSync}
-              isLoading={isLoading}
+              onSync={() => dataService.syncAll()}
+              isLoading={state.isLoading}
             />
           </>
         )}
@@ -466,24 +276,24 @@ export default function Home() {
           <BookingDialog
             isOpen={!!selectedDate}
             onClose={() => setSelectedDate(null)}
-            date={selectedDate || new Date()}
+            date={selectedDate}
             students={
-              syncedData?.bookings
+              state.bookings
                 .filter(b => normalizeDate(b.date) === normalizeDate(selectedDate))
-                .map(b => b.studentId) || []
+                .flatMap(b => b.students.map(s => s.id))
             }
             isClassDay={
-              syncedData?.classDays.some(
+              state.classDays.some(
                 d => normalizeDate(d.date) === normalizeDate(selectedDate)
-              ) || false
+              )
             }
             onStartClass={handleStartClass}
             onCloseClass={handleCloseClass}
             onRemoveStudent={handleRemoveStudent}
             onAddStudent={handleAddBookingStudent}
-            allStudents={syncedData?.students || []}
-            error={error}
-            isLoading={isLoading}
+            allStudents={state.students}
+            error={state.error}
+            isLoading={state.isLoading}
           />
         )}
 
@@ -515,16 +325,16 @@ export default function Home() {
               自動同步 (每5分鐘)
             </label>
             <button
-              onClick={handleSync}
-              disabled={isLoading || !spreadsheetId}
+              onClick={() => dataService.syncAll()}
+              disabled={state.isLoading || !state.spreadsheetId}
               className={`
                 inline-flex items-center px-4 py-2 rounded-lg
-                ${isLoading || !spreadsheetId
+                ${state.isLoading || !state.spreadsheetId
                   ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-500 text-white hover:bg-blue-600'}
               `}
             >
-              {isLoading ? (
+              {state.isLoading ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -540,7 +350,7 @@ export default function Home() {
         <div className="flex gap-4 items-center">
           <input
             type="text"
-            value={spreadsheetId}
+            value={state.spreadsheetId || ''}
             onChange={(e) => handleSpreadsheetIdChange(e.target.value)}
             placeholder="請輸入 Google Sheet ID"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -555,122 +365,11 @@ export default function Home() {
           </a>
         </div>
 
-        {error && (
+        {state.error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
+            {state.error}
           </div>
         )}
-
-        {syncedData && (
-          <div className="grid grid-cols-3 gap-6">
-            {/* 開課日期 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-lg font-medium mb-4">開課日期</h2>
-              <ul className="space-y-2">
-                {syncedData.classDays.map((day, index) => (
-                  <li key={index} className="px-3 py-2 bg-gray-50 rounded">
-                    {day.date}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* 學生預約 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-lg font-medium mb-4">學生預約</h2>
-              <div className="space-y-2">
-                {syncedData.bookings.map((booking, index) => (
-                  <div key={index} className="px-3 py-2 bg-gray-50 rounded flex justify-between">
-                    <span>{booking.date}</span>
-                    <span>{
-                      syncedData.students.find(s => s.id === booking.studentId)?.name || booking.studentId
-                    }</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 學生名冊 */}
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-lg font-medium mb-4">
-                學生名冊 ({syncedData.students.length})
-              </h2>
-              <div className="overflow-y-auto max-h-[600px]">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        編號
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        姓名
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        IG
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        狀態
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {syncedData.students.map((student, index) => (
-                      <tr key={student.id} 
-                          className={`hover:bg-gray-50 ${!student.active ? 'text-gray-400' : ''}`}>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm">
-                          {student.id}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
-                          {student.name}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm">
-                          {student.instagram}
-                        </td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                            ${student.active 
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-gray-100 text-gray-800'
-                            }`}>
-                            {student.active ? '啟用' : '停用'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-3 gap-6">
-          {/* 同步歷史記錄 */}
-          <div className="col-span-1">
-            <div className="bg-white rounded-lg shadow p-4">
-              <h2 className="text-lg font-medium mb-4">同步歷史</h2>
-              <div className="space-y-2">
-                {syncHistory.map((record, index) => (
-                  <div
-                    key={index}
-                    className={`p-2 rounded-lg text-sm ${
-                      record.status === 'success'
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-red-50 text-red-700'
-                    }`}
-                  >
-                    <div className="font-medium">
-                      {new Date(record.timestamp).toLocaleString()}
-                    </div>
-                    <div>
-                      {record.status === 'success' ? '同步成功' : record.message}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

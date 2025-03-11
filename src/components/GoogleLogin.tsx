@@ -14,11 +14,19 @@ export const GoogleLogin = ({ onSuccess, onError }: GoogleLoginProps) => {
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => {
       setIsLoading(false);
-      onSuccess(tokenResponse.access_token);
+      if (tokenResponse.access_token) {
+        onSuccess(tokenResponse.access_token);
+      } else {
+        onError('登入失敗：未獲得存取權杖');
+      }
     },
     onError: (error) => {
       setIsLoading(false);
-      onError(error.message || '登入失敗');
+      onError(error instanceof Error ? error.message : '登入失敗');
+    },
+    onNonOAuthError: (error) => {
+      setIsLoading(false);
+      onError(error.type === 'popup_closed_by_user' ? '登入已取消' : '登入失敗');
     },
     flow: 'implicit',
     scope: 'https://www.googleapis.com/auth/spreadsheets'

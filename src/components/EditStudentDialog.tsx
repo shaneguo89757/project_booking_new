@@ -1,6 +1,6 @@
-import { Fragment, useState } from 'react';
+import type { Student } from '@/services/sheetService';
 import { Dialog, Transition } from '@headlessui/react';
-import type { Student } from '@/services/localStorageService';
+import { Fragment, useState } from 'react';
 
 interface EditStudentDialogProps {
   isOpen: boolean;
