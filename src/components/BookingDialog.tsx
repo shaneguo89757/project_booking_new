@@ -13,8 +13,8 @@ interface BookingDialogProps {
   isClassDay: boolean;
   onStartClass: (date: Date) => void;
   onCloseClass: (date: Date) => void;
-  onRemoveStudent: (studentId: string, date: Date) => void;
-  onAddStudent: (studentIds: string[], date: Date) => void;
+  onRemoveBookingStudent: (studentId: string, date: Date) => void;
+  onAddBookingStudent: (studentIds: string[], date: Date) => void;
   allStudents: Student[];
   error?: string | null;
   isLoading?: boolean;
@@ -28,8 +28,8 @@ export const BookingDialog = ({
   isClassDay,
   onStartClass,
   onCloseClass,
-  onRemoveStudent,
-  onAddStudent,
+  onRemoveBookingStudent,
+  onAddBookingStudent,
   allStudents,
   error,
   isLoading = false,
@@ -120,12 +120,12 @@ export const BookingDialog = ({
                             <span>{student.name}</span>
                             {student.instagram && (
                               <span className="ml-2 text-sm text-gray-500">
-                                @{student.instagram}
+                                {student.instagram}
                               </span>
                             )}
                           </div>
                           <button
-                            onClick={() => onRemoveStudent(student.id, date)}
+                            onClick={() => onRemoveBookingStudent(student.id, date)}
                             className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-100"
                           >
                             <LeaveIcon className="w-4 h-4" />
@@ -172,7 +172,7 @@ export const BookingDialog = ({
                   isOpen={isAddStudentOpen}
                   onClose={() => setIsAddStudentOpen(false)}
                   students={allStudents}
-                  onAdd={(studentIds) => onAddStudent(studentIds, date)}
+                  onAdd={(studentIds) => onAddBookingStudent(studentIds, date)}
                   existingStudentIds={students}
                 />
               </Dialog.Panel>

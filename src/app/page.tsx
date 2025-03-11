@@ -109,14 +109,15 @@ export default function Home() {
     await dataService.addStudent(name, instagram);
   };
 
-  const handleRemoveStudent = async (studentId: string, date: Date) => {
+  const handleRemoveBookingStudent = async (studentId: string, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     await dataService.removeBooking(studentId, dateStr);
   };
 
   const handleAddBookingStudent = async (studentIds: string[], date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    await dataService.addBooking(studentIds[0], [dateStr]);
+    console.log("handleAddBookingStudent called with studentIds:", studentIds, "and date:", dateStr);
+    await dataService.addBooking(dateStr, studentIds);
   };
 
   const handleDeleteStudent = async (student: Student) => {
@@ -321,8 +322,8 @@ export default function Home() {
             }
             onStartClass={handleStartClass}
             onCloseClass={handleCloseClass}
-            onRemoveStudent={handleRemoveStudent}
-            onAddStudent={handleAddBookingStudent}
+            onRemoveBookingStudent={handleRemoveBookingStudent}
+            onAddBookingStudent={handleAddBookingStudent}
             allStudents={state.students}
             error={state.error}
             isLoading={state.isLoading}

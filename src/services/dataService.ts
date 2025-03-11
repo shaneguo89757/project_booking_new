@@ -268,13 +268,16 @@ class DataService {
         active: options?.active !== undefined ? options.active : student.active,
       };
 
-      // 更新 Google Sheets
-      if (this.state.spreadsheetId) {
-        await this.sheetService.updateStudent(
-          this.state.spreadsheetId,
-          updatedStudent
-        );
+      // 检查是否已设置 spreadsheetId
+      if (!this.state.spreadsheetId) {
+        throw new Error("尚未設定試算表 ID");
       }
+
+      // 更新 Google Sheets
+      await this.sheetService.updateStudent(
+        this.state.spreadsheetId,
+        updatedStudent
+      );
 
       // 同步所有資料
       await this.syncAll();
@@ -302,15 +305,28 @@ class DataService {
   }
 
   // 預約相關方法
-  async addBooking(studentId: string, dates: string[]) {
+  async addBooking(date: string, studentIds: string[]) {
     try {
-      const result = localStorageService.addStudentBooking(studentId, dates);
-      if (result.success) {
+      if (!this.state.spreadsheetId) {
+        throw new Error("試算表 ID 未設定");
+      }
+
+      try {
+        // 添加到 Google Sheets
+        await this.sheetService.addBooking(
+          this.state.spreadsheetId,
+          date,
+          studentIds
+        );
+
+        // 同步所有数据以确保本地状态更新
         await this.syncAll();
-      } else {
-        this.setState({ error: result.error });
+      } catch (error) {
+        console.error("DataService: 添加预约到 Google Sheets 失败:", error);
+        throw error;
       }
     } catch (error) {
+      console.error("DataService: 添加预约失败:", error);
       this.setState({
         error: error instanceof Error ? error.message : "新增預約失敗",
       });
@@ -319,18 +335,23 @@ class DataService {
 
   async removeBooking(studentId: string, date: string) {
     try {
-      const result = localStorageService.removeStudentFromBooking(
+      if (!this.state.spreadsheetId) {
+        throw new Error("尚未設定試算表 ID");
+      }
+
+      // 删除 Google Sheets 中的预约
+      await this.sheetService.removeBooking(
+        this.state.spreadsheetId,
         studentId,
         date
       );
-      if (result.success) {
-        await this.syncAll();
-      } else {
-        this.setState({ error: result.error });
-      }
+
+      // 同步所有数据以确保本地状态更新
+      await this.syncAll();
     } catch (error) {
+      console.error("DataService: 刪除預約失敗:", error);
       this.setState({
-        error: error instanceof Error ? error.message : "取消預約失敗",
+        error: error instanceof Error ? error.message : "刪除預約失敗",
       });
     }
   }

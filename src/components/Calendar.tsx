@@ -1,8 +1,8 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo } from 'react-big-calendar';
-import { format, parse, startOfWeek, getDay, setDefaultOptions } from 'date-fns';
-import { zhTW } from 'date-fns/locale';
 import { BookmarkIcon } from '@heroicons/react/24/solid';
+import { format, getDay, parse, setDefaultOptions, startOfWeek } from 'date-fns';
+import { zhTW } from 'date-fns/locale';
+import { useEffect, useMemo, useState } from 'react';
+import { Calendar as BigCalendar, dateFnsLocalizer, SlotInfo } from 'react-big-calendar';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 // 設定 date-fns 的預設選項，將每週起始日設為星期一
@@ -66,6 +66,7 @@ export const Calendar = ({
   // 將 bookings 轉換為 react-big-calendar 的事件格式
   const events = useMemo(() => 
     bookings.map(booking => {
+      console.log("Calendar: 处理预约数据:", booking);
       const date = parse(booking.date, 'yyyy-MM-dd', new Date());
       const studentCount = booking.students.length;
       const isFull = studentCount >= maxStudents;

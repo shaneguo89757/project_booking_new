@@ -10,6 +10,7 @@ export interface Student {
 export interface Booking {
   date: string;
   studentId: string;
+  studentName: string;
 }
 
 export interface ClassDay {
@@ -86,13 +87,20 @@ export class SheetService {
 
   async getBookings(spreadsheetId: string): Promise<Booking[]> {
     try {
-      const range = `${this.SHEETS.BOOKINGS}!A2:B`; // 跳過標題行
+      const range = `${this.SHEETS.BOOKINGS}!A2:C`; // 跳過標題行
       const values = await this.fetchSheetData(spreadsheetId, range);
 
-      return values.map((row) => ({
-        date: row[0],
-        studentId: row[1],
+      // 加入除錯日誌
+      console.log("SheetService: 获取预约数据:", values);
+
+      const bookings = values.map((row) => ({
+        date: normalizeDate(row[0]), // 确保日期格式正确
+        studentName: row[1],
+        studentId: row[2],
       }));
+
+      console.log("SheetService: 处理后的预约数据:", bookings);
+      return bookings;
     } catch (error) {
       console.error("Error fetching bookings:", error);
       throw error;
@@ -329,7 +337,7 @@ export class SheetService {
 
       // 2. 添加新的課程日期（使用格式化後的日期）
       const appendResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.CLASS_DAYS}!A:A:append?valueInputOption=USER_ENTERED`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.CLASS_DAYS}!A:A:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
         {
           method: "POST",
           headers: {
@@ -398,6 +406,82 @@ export class SheetService {
     } catch (error) {
       console.error("Error adding class day:", error);
       throw error;
+    }
+  }
+
+  // 同步學生名稱修改到 booking (將 booking 中某位學生名稱進行更新)
+  async syncBookingStudentName(
+    spreadsheetId: string,
+    student: Student
+  ): Promise<boolean> {
+    try {
+      if (!this.accessToken) {
+        throw new Error("Access token not set");
+      }
+
+      // 1. 獲取所有的booking
+      const range = `${this.SHEETS.BOOKINGS}!A2:C`;
+      console.log("SheetService: 获取booking数据范围:", range);
+      const values = await this.fetchSheetData(spreadsheetId, range);
+      console.log("SheetService: 当前表格数据:", values);
+
+      // 2. 找到該學生 id 所有(多個)要更新的資料行
+      const rowsToUpdate = values.reduce<number[]>((acc, row, index) => {
+        if (row[2] === student.id) {
+          // 第三列是 studentId
+          acc.push(index + 2); // +2 是因為跳過標題行，且行號從1開始
+        }
+        return acc;
+      }, []);
+
+      console.log("SheetService: 需要更新的行:", rowsToUpdate);
+
+      if (rowsToUpdate.length === 0) {
+        console.log("SheetService: 没有找到需要更新的预约记录");
+        return true;
+      }
+
+      // 3. 更新所有行資料
+      const updatePromises = rowsToUpdate.map(async (rowNumber) => {
+        const updateRange = `${this.SHEETS.BOOKINGS}!B${rowNumber}`;
+        console.log(
+          `SheetService: 更新行 ${rowNumber} 的学生名字为 ${student.name}`
+        );
+
+        const response = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              values: [[student.name]], // 只更新名字列
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            `更新第 ${rowNumber} 行失敗: ${
+              errorData.error?.message || "未知錯誤"
+            }`
+          );
+        }
+
+        return response.json();
+      });
+
+      // 等待所有更新完成
+      await Promise.all(updatePromises);
+      console.log("SheetService: 所有预约记录更新完成");
+
+      return true;
+    } catch (error) {
+      console.error("Error renaming class day student name:", error);
+      throw error; // 重新抛出错误，让调用者知道发生了错误
     }
   }
 
@@ -526,7 +610,7 @@ export class SheetService {
 
       // 添加新行
       const appendResponse = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.STUDENTS}!A:D:append?valueInputOption=USER_ENTERED`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.STUDENTS}!A:D:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
         {
           method: "POST",
           headers: {
@@ -593,6 +677,201 @@ export class SheetService {
       return newStudent;
     } catch (error) {
       console.error("SheetService: 添加学员时发生错误:", error);
+      throw error;
+    }
+  }
+
+  // 新增學生預約 (單一日期多位學生)
+  async addBooking(
+    spreadsheetId: string,
+    date: string,
+    studentIds: string[]
+  ): Promise<boolean> {
+    try {
+      if (!this.accessToken) {
+        throw new Error("Access token not set");
+      }
+
+      console.log("SheetService: 开始添加预约:", { date, studentIds });
+
+      // 1. 获取所有学生信息
+      const students = await this.getStudents(spreadsheetId);
+      const selectedStudents = students.filter((s) =>
+        studentIds.includes(s.id)
+      );
+
+      if (selectedStudents.length !== studentIds.length) {
+        const missingIds = studentIds.filter(
+          (id) => !selectedStudents.some((s) => s.id === id)
+        );
+        throw new Error(`找不到以下學生: ${missingIds.join(", ")}`);
+      }
+
+      // 2. 准备要添加的预约数据
+      const bookingDate = normalizeDate(date);
+      const bookingData = selectedStudents.map((student) => [
+        bookingDate, // 日期
+        student.name, // 学生姓名
+        student.id, // 学生ID
+      ]);
+
+      console.log("SheetService: 准备添加的预约数据:", bookingData);
+
+      // 3. 添加预约记录
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.BOOKINGS}!A:C:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: bookingData,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("SheetService: 添加预约失败:", errorData);
+        throw new Error(errorData.error?.message || "新增預約失敗");
+      }
+
+      const responseData = await response.json();
+      console.log("SheetService: 添加预约成功，响应:", responseData);
+
+      // 4. 获取工作表 ID 并对数据进行排序
+      const sheetId = await this.getSheetId(
+        spreadsheetId,
+        this.SHEETS.BOOKINGS
+      );
+
+      // 5. 按日期排序预约记录
+      const sortResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                sortRange: {
+                  range: {
+                    sheetId: sheetId,
+                    startRowIndex: 1, // 跳过标题行
+                    startColumnIndex: 0,
+                    endColumnIndex: 3,
+                  },
+                  sortSpecs: [
+                    {
+                      dimensionIndex: 0, // 按日期列排序
+                      sortOrder: "ASCENDING",
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!sortResponse.ok) {
+        console.warn("SheetService: 排序失败，但不影响添加操作");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("SheetService: 添加预约时发生错误:", error);
+      throw error;
+    }
+  }
+
+  // 刪除學生預約
+  async removeBooking(
+    spreadsheetId: string,
+    studentId: string,
+    date: string
+  ): Promise<boolean> {
+    try {
+      if (!this.accessToken) {
+        throw new Error("Access token not set");
+      }
+
+      console.log("SheetService: 开始删除预约:", { studentId, date });
+
+      // 1. 获取所有预约记录
+      const range = `${this.SHEETS.BOOKINGS}!A2:C`;
+      const values = await this.fetchSheetData(spreadsheetId, range);
+      console.log("SheetService: 当前预约数据:", values);
+
+      // 2. 找到要删除的预约记录行号
+      const normalizedTargetDate = normalizeDate(date);
+      const rowsToDelete = values.reduce<number[]>((acc, row, index) => {
+        const rowDate = normalizeDate(row[0]);
+        const rowStudentId = row[2];
+        if (rowDate === normalizedTargetDate && rowStudentId === studentId) {
+          // +2 是因为跳过标题行，且行号从1开始
+          acc.push(index + 2);
+        }
+        return acc;
+      }, []);
+
+      console.log("SheetService: 需要删除的行:", rowsToDelete);
+
+      if (rowsToDelete.length === 0) {
+        console.log("SheetService: 没有找到需要删除的预约记录");
+        return true;
+      }
+
+      // 3. 获取工作表 ID
+      const sheetId = await this.getSheetId(
+        spreadsheetId,
+        this.SHEETS.BOOKINGS
+      );
+
+      // 4. 从后往前删除行（这样不会影响前面行的索引）
+      const deleteRequests = rowsToDelete
+        .sort((a, b) => b - a) // 降序排序
+        .map((rowIndex) => ({
+          deleteDimension: {
+            range: {
+              sheetId: sheetId,
+              dimension: "ROWS",
+              startIndex: rowIndex - 1, // 转换为0基索引
+              endIndex: rowIndex, // 结束索引是不包含的
+            },
+          },
+        }));
+
+      // 5. 执行删除操作
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            requests: deleteRequests,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("SheetService: 删除预约失败:", errorData);
+        throw new Error(errorData.error?.message || "刪除預約失敗");
+      }
+
+      console.log("SheetService: 预约删除成功");
+      return true;
+    } catch (error) {
+      console.error("SheetService: 删除预约时发生错误:", error);
       throw error;
     }
   }
