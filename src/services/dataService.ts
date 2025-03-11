@@ -209,13 +209,43 @@ class DataService {
   // 學生相關方法
   async addStudent(name: string) {
     try {
-      const newStudent = localStorageService.addStudent(name);
+      console.log("DataService: 开始添加新学员:", name);
+
+      // 检查是否已设置 spreadsheetId
+      if (!this.state.spreadsheetId) {
+        throw new Error("尚未設定試算表 ID");
+      }
+
+      // 创建新学员对象（不包含 ID，因为 ID 将由 SheetService 生成）
+      const studentData = {
+        name,
+        instagram: "",
+        active: true,
+      };
+
+      console.log("DataService: 准备添加学员数据:", studentData);
+
+      // 添加到 Google Sheets 并获取包含新 ID 的完整学员数据
+      const newStudent = await this.sheetService.addStudent(
+        this.state.spreadsheetId,
+        studentData
+      );
+      console.log(
+        "DataService: 已添加到 Google Sheets，返回的数据:",
+        newStudent
+      );
+
+      // 同步所有数据以确保本地状态更新
       await this.syncAll();
+      console.log("DataService: 数据同步完成");
+
       return newStudent;
     } catch (error) {
+      console.error("DataService: 添加学员失败:", error);
       this.setState({
-        error: error instanceof Error ? error.message : "新增學生失敗",
+        error: error instanceof Error ? error.message : "新增學員失敗",
       });
+      throw error;
     }
   }
 

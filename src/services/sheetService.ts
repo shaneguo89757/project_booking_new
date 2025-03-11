@@ -471,6 +471,131 @@ export class SheetService {
       throw error;
     }
   }
+
+  private async getMaxStudentId(spreadsheetId: string): Promise<number> {
+    try {
+      // 获取所有学员数据
+      const range = `${this.SHEETS.STUDENTS}!A2:A`;
+      const values = await this.fetchSheetData(spreadsheetId, range);
+
+      // 过滤出数字 ID 并找出最大值
+      const maxId = values.reduce((max, row) => {
+        const id = parseInt(row[0], 10);
+        return isNaN(id) ? max : Math.max(max, id);
+      }, 0);
+
+      console.log("SheetService: 当前最大学员 ID:", maxId);
+      return maxId;
+    } catch (error) {
+      console.error("SheetService: 获取最大学员 ID 失败:", error);
+      throw error;
+    }
+  }
+
+  async addStudent(
+    spreadsheetId: string,
+    student: Omit<Student, "id">
+  ): Promise<Student> {
+    try {
+      if (!this.accessToken) {
+        throw new Error("Access token not set");
+      }
+
+      console.log("SheetService: 开始添加新学员:", student);
+
+      // 获取当前最大 ID 并生成新 ID
+      const maxId = await this.getMaxStudentId(spreadsheetId);
+      const newId = (maxId + 1).toString();
+      console.log("SheetService: 生成新 ID:", newId);
+
+      const newStudent: Student = {
+        ...student,
+        id: newId,
+        active: true,
+      };
+
+      // 准备新学员数据
+      const newStudentData = [
+        newStudent.id,
+        newStudent.name,
+        newStudent.instagram || "",
+        newStudent.active.toString().toLowerCase(),
+      ];
+
+      console.log("SheetService: 准备添加的数据:", newStudentData);
+
+      // 添加新行
+      const appendResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${this.SHEETS.STUDENTS}!A:D:append?valueInputOption=USER_ENTERED`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: [newStudentData],
+          }),
+        }
+      );
+
+      if (!appendResponse.ok) {
+        const errorData = await appendResponse.json();
+        console.error("SheetService: 添加学员失败:", errorData);
+        throw new Error(errorData.error?.message || "新增學員失敗");
+      }
+
+      const responseData = await appendResponse.json();
+      console.log("SheetService: 添加学员成功，响应:", responseData);
+
+      // 获取工作表 ID 并对数据进行排序
+      const sheetId = await this.getSheetId(
+        spreadsheetId,
+        this.SHEETS.STUDENTS
+      );
+
+      // 对学生名册按姓名排序
+      const sortResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            requests: [
+              {
+                sortRange: {
+                  range: {
+                    sheetId: sheetId,
+                    startRowIndex: 1, // 跳过标题行
+                    startColumnIndex: 0,
+                    endColumnIndex: 4,
+                  },
+                  sortSpecs: [
+                    {
+                      dimensionIndex: 0, // 按流水號排序
+                      sortOrder: "ASCENDING",
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        }
+      );
+
+      if (!sortResponse.ok) {
+        console.warn("SheetService: 排序失败，但不影响添加操作");
+      }
+
+      return newStudent;
+    } catch (error) {
+      console.error("SheetService: 添加学员时发生错误:", error);
+      throw error;
+    }
+  }
 }
 
 export const sheetService = new SheetService();
