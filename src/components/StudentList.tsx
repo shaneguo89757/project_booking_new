@@ -27,17 +27,29 @@ export const StudentList = ({
   const [searchTerm, setSearchTerm] = useState('');
 
   // 過濾和分組學生
-  const { groupedStudents, indices } = useMemo(() => {
+  const { groupedStudents, indices, totalActive, totalInactive } = useMemo(() => {
+    console.log("StudentList: 处理学员数据，总数:", students.length);
     const filteredStudents = students
       .filter(student => 
-        (searchTerm === '' || 
-         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-         student.instagram?.toLowerCase().includes(searchTerm.toLowerCase()))
+        searchTerm === '' || 
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.instagram && student.instagram.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     
     const grouped: GroupedStudents = {};
+    let activeCount = 0;
+    let inactiveCount = 0;
     
     filteredStudents.forEach(student => {
+      // 計算活躍/非活躍學生數量
+      if (student.active) {
+        activeCount++;
+      } else {
+        inactiveCount++;
+      }
+      console.log(`StudentList: 学员 ${student.name} 状态:`, student.active ? "活跃" : "停用");
+
+      // 按姓名首字母分組
       const firstChar = student.name.charAt(0);
       if (!grouped[firstChar]) {
         grouped[firstChar] = [];
@@ -45,13 +57,28 @@ export const StudentList = ({
       grouped[firstChar].push(student);
     });
 
+    // 對每個組內的學生按姓名排序
     Object.keys(grouped).forEach(key => {
-      grouped[key].sort((a, b) => a.name.localeCompare(b.name));
+      grouped[key].sort((a, b) => {
+        // 首先按活躍狀態排序（活躍的排在前面）
+        if (a.active !== b.active) {
+          return a.active ? -1 : 1;
+        }
+        // 然後按姓名排序
+        return a.name.localeCompare(b.name);
+      });
     });
+
+    console.log("StudentList: 统计完成 -", 
+      "活跃:", activeCount,
+      "停用:", inactiveCount
+    );
 
     return {
       groupedStudents: grouped,
       indices: Object.keys(grouped).sort(),
+      totalActive: activeCount,
+      totalInactive: inactiveCount,
     };
   }, [students, searchTerm]);
 
@@ -59,7 +86,14 @@ export const StudentList = ({
     <div className="max-w-2xl mx-auto bg-white rounded-lg shadow">
       <div className="p-4 border-b">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">學員管理</h2>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">學員管理</h2>
+            <div className="text-sm text-gray-500 mt-1">
+              共 {students.length} 位學員 
+              <span className="ml-2 text-green-600">({totalActive} 位活躍</span>
+              <span className="ml-1 text-red-600">{totalInactive} 位停用)</span>
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
             {onSync && (
               <button
@@ -109,14 +143,21 @@ export const StudentList = ({
                   {groupedStudents[index].map(student => (
                     <li
                       key={student.id}
-                      className="px-4 py-3 flex justify-between items-center hover:bg-gray-50"
+                      className={`px-4 py-3 flex justify-between items-center hover:bg-gray-50 ${
+                        !student.active ? 'opacity-60' : ''
+                      }`}
                     >
                       <div>
                         <span className="text-gray-900">{student.name}</span>
                         {student.instagram && (
-                          <span className="ml-2 text-sm text-gray-500">
-                            @{student.instagram}
-                          </span>
+                          <a
+                            href={`https://instagram.com/${student.instagram}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-2 text-sm text-blue-500 hover:text-blue-700"
+                          >
+                            {student.instagram}
+                          </a>
                         )}
                         <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
                           student.active 
@@ -131,14 +172,21 @@ export const StudentList = ({
                           <button
                             onClick={() => onEditStudent(student)}
                             className="p-1 text-gray-400 hover:text-blue-600 rounded-full hover:bg-blue-50"
+                            title="編輯學員"
                           >
                             <PencilIcon className="w-4 h-4" />
                           </button>
                         )}
-                        {onDeleteStudent && (
+                        {onDeleteStudent && student.active && (
                           <button
-                            onClick={() => onDeleteStudent(student)}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              console.log("Delete button clicked for student:", student);
+                              onDeleteStudent(student);
+                            }}
                             className="p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50"
+                            title={student.active ? "停用學員" : "學員已停用"}
                           >
                             <TrashIcon className="w-4 h-4" />
                           </button>

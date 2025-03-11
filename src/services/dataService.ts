@@ -124,10 +124,15 @@ class DataService {
     }
 
     try {
+      console.log("DataService: 开始同步数据...");
       this.setState({ isLoading: true, error: null });
+
+      console.log("DataService: 调用 sheetService.syncAll...");
       const data = await this.sheetService.syncAll(this.state.spreadsheetId);
+      console.log("DataService: 获取到的数据:", data);
 
       // 更新所有數據
+      console.log("DataService: 开始更新状态...");
       this.setState({
         // 更新學生資料
         students: data.students,
@@ -151,7 +156,9 @@ class DataService {
         // 更新開課日期
         classDays: data.classDays,
       });
+      console.log("DataService: 状态更新完成");
     } catch (error) {
+      console.error("DataService: 同步数据时发生错误:", error);
       const errorMessage = error instanceof Error ? error.message : "同步失敗";
       this.setState({ error: errorMessage });
 
@@ -160,6 +167,7 @@ class DataService {
       }
     } finally {
       this.setState({ isLoading: false });
+      console.log("DataService: 同步流程结束");
     }
   }
 
@@ -211,18 +219,40 @@ class DataService {
     }
   }
 
-  async editStudent(studentId: string, newName: string) {
+  async editStudent(
+    studentId: string,
+    newName: string,
+    options?: { active?: boolean }
+  ) {
     try {
-      const result = localStorageService.editStudent(studentId, newName);
-      if (result.success) {
-        await this.syncAll();
-      } else {
-        this.setState({ error: result.error });
+      // 先從當前狀態中獲取學生資料
+      const student = this.state.students.find((s) => s.id === studentId);
+      if (!student) {
+        throw new Error("找不到學生資料");
       }
+
+      // 更新學生資料
+      const updatedStudent = {
+        ...student,
+        name: newName,
+        active: options?.active !== undefined ? options.active : student.active,
+      };
+
+      // 更新 Google Sheets
+      if (this.state.spreadsheetId) {
+        await this.sheetService.updateStudent(
+          this.state.spreadsheetId,
+          updatedStudent
+        );
+      }
+
+      // 同步所有資料
+      await this.syncAll();
     } catch (error) {
       this.setState({
         error: error instanceof Error ? error.message : "編輯學生失敗",
       });
+      throw error; // 向上傳遞錯誤
     }
   }
 

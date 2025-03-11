@@ -34,7 +34,10 @@ export class SheetService {
     window.dispatchEvent(new CustomEvent("tokenExpired"));
   }
 
-  private async fetchSheetData(spreadsheetId: string, range: string) {
+  private async fetchSheetData(
+    spreadsheetId: string,
+    range: string
+  ): Promise<string[][]> {
     if (!this.accessToken) {
       throw new Error("Not authenticated");
     }
@@ -394,6 +397,77 @@ export class SheetService {
       return true;
     } catch (error) {
       console.error("Error adding class day:", error);
+      throw error;
+    }
+  }
+
+  async updateStudent(
+    spreadsheetId: string,
+    student: Student
+  ): Promise<boolean> {
+    try {
+      if (!this.accessToken) {
+        throw new Error("Access token not set");
+      }
+
+      console.log("SheetService: 开始更新学员数据:", student);
+
+      // 1. 獲取所有學生資料
+      const range = `${this.SHEETS.STUDENTS}!A2:D`;
+      console.log("SheetService: 获取学员数据范围:", range);
+      const values = await this.fetchSheetData(spreadsheetId, range);
+      console.log("SheetService: 当前表格数据:", values);
+
+      // 2. 找到要更新的學生的行號
+      const rowIndex = values.findIndex((row) => row[0] === student.id);
+      console.log("SheetService: 找到学员所在行:", rowIndex + 2);
+
+      if (rowIndex === -1) {
+        throw new Error("找不到該學生");
+      }
+
+      // 3. 更新該行資料
+      const updateRange = `${this.SHEETS.STUDENTS}!A${rowIndex + 2}:D${
+        rowIndex + 2
+      }`;
+      console.log("SheetService: 更新范围:", updateRange);
+
+      // 準備更新的數據
+      const updateData = [
+        student.id,
+        student.name,
+        student.instagram || "",
+        student.active.toString().toLowerCase(), // 确保布尔值转换为小写字符串
+      ];
+
+      console.log("SheetService: 准备更新的数据:", updateData);
+
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${updateRange}?valueInputOption=USER_ENTERED`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            values: [updateData],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("SheetService: 更新失败:", errorData);
+        throw new Error(errorData.error?.message || "更新學生資料失敗");
+      }
+
+      const responseData = await response.json();
+      console.log("SheetService: 更新成功，响应:", responseData);
+
+      return true;
+    } catch (error) {
+      console.error("SheetService: 更新学员时发生错误:", error);
       throw error;
     }
   }

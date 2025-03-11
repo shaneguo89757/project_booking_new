@@ -4,6 +4,7 @@ import { AddStudentDialog } from '@/components/AddStudentDialog';
 import { BookingDialog } from '@/components/BookingDialog';
 import { BookingListView } from '@/components/BookingListView';
 import { Calendar } from '@/components/Calendar';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { EditStudentDialog } from '@/components/EditStudentDialog';
 import { GoogleLogin } from '@/components/GoogleLogin';
 import { StudentList } from '@/components/StudentList';
@@ -26,6 +27,13 @@ export default function Home() {
   const [autoSync, setAutoSync] = useState(false);
   const searchParams = useSearchParams();
   const [state, setState] = useState<DataServiceState>(dataService.getState());
+  const [confirmDialogState, setConfirmDialogState] = useState<{
+    isOpen: boolean;
+    student: Student | null;
+  }>({
+    isOpen: false,
+    student: null,
+  });
 
   // 訂閱數據變化
   useEffect(() => {
@@ -112,8 +120,32 @@ export default function Home() {
   };
 
   const handleDeleteStudent = async (student: Student) => {
-    if (confirm(`確定要刪除學生 ${student.name} 嗎？`)) {
-      await dataService.deleteStudent(student.id);
+    console.log("handleDeleteStudent called with student:", student);
+    setConfirmDialogState({ isOpen: true, student });
+  };
+
+  const handleConfirmDeactivate = async () => {
+    const student = confirmDialogState.student;
+    if (!student) return;
+
+    console.log("开始停用学员:", student);
+    try {
+      console.log("调用 editStudent...");
+      await dataService.editStudent(student.id, student.name, { active: false });
+      console.log("editStudent 调用成功，开始同步数据...");
+      
+      // 强制刷新数据
+      await dataService.syncAll();
+      console.log("数据同步完成");
+      
+      // 关闭对话框
+      setConfirmDialogState({ isOpen: false, student: null });
+      
+      // 显示成功消息
+      window.alert("已成功停用學員");
+    } catch (error) {
+      console.error("停用學員失敗:", error);
+      window.alert("停用學員失敗，請稍後再試");
     }
   };
 
@@ -370,6 +402,24 @@ export default function Home() {
             {state.error}
           </div>
         )}
+
+        <ConfirmDialog
+          isOpen={confirmDialogState.isOpen}
+          onClose={() => setConfirmDialogState({ isOpen: false, student: null })}
+          onConfirm={handleConfirmDeactivate}
+          title={`停用學員確認`}
+          description={confirmDialogState.student ? 
+            `是否要停用學員「${confirmDialogState.student.name}」？\n\n` +
+            '停用後：\n' +
+            '• 學員將被標記為「已停用」狀態\n' +
+            '• 學員資料仍會保留在系統中\n' +
+            '• 可以隨時重新啟用該學員'
+            : ''
+          }
+          confirmText="停用學員"
+          cancelText="取消"
+          type="danger"
+        />
       </main>
     </div>
   );
