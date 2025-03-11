@@ -148,24 +148,26 @@ export const StudentList = ({
                       }`}
                     >
                       <div>
-                        <span className="text-gray-900">{student.name}</span>
+                        <div className="flex items-center">
+                          <span className="text-gray-900">{student.name}</span>
+                          <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                            student.active 
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {student.active ? '啟用' : '停用'}
+                          </span>
+                        </div>
                         {student.instagram && (
                           <a
                             href={`https://instagram.com/${student.instagram}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="ml-2 text-sm text-blue-500 hover:text-blue-700"
+                            className="block mt-0.5 text-xs text-blue-500 hover:text-blue-700"
                           >
                             {student.instagram}
                           </a>
                         )}
-                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
-                          student.active 
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {student.active ? '啟用' : '停用'}
-                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         {onEditStudent && (
